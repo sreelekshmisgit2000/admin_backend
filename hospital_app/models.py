@@ -201,3 +201,4 @@ class AccreditationRenewal(models.Model):
     documents_submitted = models.BooleanField(default=False)
     fees_paid = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
+

@@ -3,6 +3,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+import json
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
 
 @csrf_exempt
 def admin_login_api(request):
@@ -39,3 +50,19 @@ def admin_login_api(request):
         "status": "error",
         "message": "Only POST method allowed"
     }, status=405)
+
+
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"status": "success", "message": "Logout successful"})
+        except Exception as e:
+            return Response({"status": "error", "message": str(e)}, status=400)

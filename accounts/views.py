@@ -12,8 +12,13 @@ import random
 from accounts.serializers import CustomerSignupSerializer
 from accounts.models import CustomUser
 from otp_app.models import OTP
+from .models import PasswordResetOTP
+from django.conf import settings
+from .serializers import SendPasswordResetOTPSerializer, VerifyPasswordResetOTPSerializer, ResetPasswordSerializer
+from django.contrib.auth import get_user_model
 
 
+User = get_user_model()
 
 class CustomerSignupView(APIView):
     def post(self, request):
@@ -58,7 +63,7 @@ class VerifySignupOTPView(APIView):
 
             if latest_otp:
                 
-                if timezone.now() > latest_otp.created_at + timezone.timedelta(minutes=1):
+                if timezone.now() > latest_otp.created_at + timezone.timedelta(minutes=5):
                     return Response({"status": "fail", "message": "OTP expired"}, status=400)
 
                 if latest_otp.code == otp:
@@ -122,7 +127,7 @@ class VerifyLoginOTPView(APIView):
 
             if latest_otp:
               
-                if timezone.now() > latest_otp.created_at + timezone.timedelta(minutes=1):
+                if timezone.now() > latest_otp.created_at + timezone.timedelta(minutes=10):
                     return Response({"status": "fail", "message": "OTP expired"}, status=400)
 
                 if latest_otp.code == otp:
@@ -138,3 +143,73 @@ class VerifyLoginOTPView(APIView):
             return Response({"status": "fail", "message": "Invalid OTP"}, status=400)
         except CustomUser.DoesNotExist:
             return Response({"status": "fail", "message": "User not found"}, status=404)
+
+
+
+
+
+class SendPasswordResetOTPView(APIView):
+    def post(self, request):
+        serializer = SendPasswordResetOTPSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            try:
+                user = CustomUser.objects.get(email=email)
+            except CustomUser.DoesNotExist:
+                return Response({'error': 'Email not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            otp = str(random.randint(100000, 999999))
+
+            
+            PasswordResetOTP.objects.update_or_create(
+                email=email,
+                defaults={
+                    'otp': otp,
+                    'is_verified': False,
+                }
+            )
+
+            send_mail(
+                subject='Password Reset OTP',
+                message=f'Your OTP for password reset is: {otp}',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+            )
+
+            return Response({'status': 'success', 'message': 'OTP sent to email. Please verify.', 'email': email}, status=200)
+
+        return Response(serializer.errors, status=400)
+
+class VerifyPasswordResetOTPView(APIView):
+    def post(self, request):
+        serializer = VerifyPasswordResetOTPSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            otp = serializer.validated_data['otp']
+
+            try:
+                otp_obj = PasswordResetOTP.objects.get(email=email, otp=otp, is_verified=False)
+                if otp_obj.is_expired():
+                    return Response({'error': 'OTP expired'}, status=status.HTTP_400_BAD_REQUEST)
+                otp_obj.is_verified = True
+                otp_obj.save()
+                return Response({'message': 'OTP verified'}, status=status.HTTP_200_OK)
+            except PasswordResetOTP.DoesNotExist:
+                return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResetPasswordView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        new_password = request.data.get("new_password")
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=404)
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password reset successful."})

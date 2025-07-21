@@ -20,8 +20,15 @@ from hospital_app.api import router
 
 urlpatterns = [
     path('admin/', admin.site.urls),  
+    path('admin_app/', include('admin_app.urls')), 
     path('api/accounts/', include('accounts.urls')),
     path('api/otp/', include('otp_app.urls')),
     path('api/treatment/', include(router.urls)),
-    path('doctors/',include("doctors_app.urls")),
+    path('api/slot/', include('slot_app.urls')),  
+    path('api/web/',include("webinar_app.urls")),
+    path('api/intro/',include("introduction_app.urls")),
+    path('api/reviews/', include('hospital_reviews.urls')),
+    path('api/doctors/', include('doctors_reviews.urls')),
+
+
 ]

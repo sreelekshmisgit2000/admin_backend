@@ -1,6 +1,11 @@
 from rest_framework import serializers
 from accounts.models import CustomUser
 import re
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from accounts.models import PasswordResetOTP
+
+
 
 class CustomerSignupSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
@@ -44,3 +49,32 @@ class CustomerSignupSerializer(serializers.ModelSerializer):
         user.set_password(validated_data['password'])
         user.save()
         return user
+
+
+User = get_user_model()
+
+class SendPasswordResetOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class VerifyPasswordResetOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField()
+
+    def validate(self, data):
+        email = data.get('email')
+        otp = data.get('otp')
+
+        try:
+            otp_obj = PasswordResetOTP.objects.get(email=email, otp=otp)
+        except PasswordResetOTP.DoesNotExist:
+            raise serializers.ValidationError("Invalid OTP.")
+
+        if otp_obj.is_expired():
+            raise serializers.ValidationError("OTP has expired.")
+
+        return data
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    new_password = serializers.CharField(min_length=6)
